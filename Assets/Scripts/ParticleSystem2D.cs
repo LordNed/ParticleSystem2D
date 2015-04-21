@@ -14,6 +14,7 @@ public class ParticleSystem2D : MonoBehaviour
     public int MaxParticles;
     public Vector2 StartVelocity;
     public int EmissionRate;
+    public float StartLifeTime;
 
     private Particle2D[] m_particleCache;
     private float m_particleExcessAccumulator;
@@ -66,6 +67,7 @@ public class ParticleSystem2D : MonoBehaviour
             // Set the particle's velocity
             m_particleCache[m_currentParticleCount].Position = Vector3.zero;
             m_particleCache[m_currentParticleCount].Velocity = StartVelocity;
+            m_particleCache[m_currentParticleCount].LifeTime = StartLifeTime;
             m_currentParticleCount++;
         }
 
@@ -75,6 +77,27 @@ public class ParticleSystem2D : MonoBehaviour
         for(int i = 0; i < m_currentParticleCount; i++)
         {
             m_particleCache[i].Position += m_particleCache[i].Velocity;
+            m_particleCache[i].LifeTime -= Time.deltaTime;
+        }
+
+
+        //////////////////
+        /// PRUNE DEAD PARTICLES
+        //////////////////
+
+
+        for(int i = 0; i < m_currentParticleCount; i++)
+        {
+            if (m_particleCache[i].LifeTime <= 0f)
+            {
+                // Remove the particle by swapping it with our last live particle
+                // and then deincrement the live particle count.
+                Particle2D lastLive = m_particleCache[m_currentParticleCount - 1];
+                Particle2D deadParticle = m_particleCache[i];
+                m_particleCache[i] = lastLive;
+                m_particleCache[m_currentParticleCount - 1] = deadParticle;
+                m_currentParticleCount--;
+            }
         }
 
 
