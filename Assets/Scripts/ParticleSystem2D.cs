@@ -61,11 +61,18 @@ public class ParticleSystem2D : MonoBehaviour
             indiciesUpdated = true;
 
         // Update the particle's position and other things.
+        float deltaTime = Time.deltaTime;
+        Vector2 gravity = Physics2D.gravity * deltaTime;
+
         for (int i = 0; i < m_currentParticleCount; i++)
         {
-            m_particleCache[i].Velocity += Physics2D.gravity * Time.deltaTime;
-            m_particleCache[i].Position += m_particleCache[i].Velocity * Time.deltaTime;
-            m_particleCache[i].LifeTime -= Time.deltaTime;
+            Particle2D ptc = m_particleCache[i];
+
+            ptc.Velocity = ptc.Velocity + gravity;
+
+            ptc.Position = ptc.Position + (ptc.Velocity * deltaTime);
+
+            ptc.LifeTime -= Time.deltaTime;
         }
 
         // Prune dead particles
