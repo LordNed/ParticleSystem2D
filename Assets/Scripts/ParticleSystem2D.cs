@@ -1,9 +1,10 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class ParticleSystem2D : MonoBehaviour
 {
-    private class Particle2D
+    public class Particle2D
     {
         public Vector2 Position;
         public Vector2 Velocity;
@@ -17,6 +18,7 @@ public class ParticleSystem2D : MonoBehaviour
     public float StartLifeTime;
     public float StartSize;
     public float GravityMultiplier = 1f;
+    public List<BaseParticleForce2D> Forces = new List<BaseParticleForce2D>();
 
     private Particle2D[] m_particleCache;
     private float m_particleExcessAccumulator;
@@ -41,6 +43,12 @@ public class ParticleSystem2D : MonoBehaviour
 
         GenerateMesh();
         m_meshFilterCache.mesh = m_meshCache;
+
+        // Copy the public Forces array, clear it, and then add them all back (lol)
+        var startForces = new List<BaseParticleForce2D>(Forces);
+        Forces.Clear();
+        foreach (var force in startForces)
+            AddForce(force);
     }
 
     private void OnDrawGizmos()
@@ -51,29 +59,15 @@ public class ParticleSystem2D : MonoBehaviour
         {
             Gizmos.DrawWireSphere(m_particleCache[i].Position, 0.1f);
         }
+
+        for (int i = 0; i < Forces.Count; i++)
+            Forces[i].OnDrawGizmosSelected();
     }
 
     private void LateUpdate()
     {
         bool indiciesUpdated = false;
 
-        if (CheckAndSpawnNewParticles())
-            indiciesUpdated = true;
-
-        // Update the particle's position and other things.
-        float deltaTime = Time.deltaTime;
-        Vector2 gravity = Physics2D.gravity * deltaTime;
-
-        for (int i = 0; i < m_currentParticleCount; i++)
-        {
-            Particle2D ptc = m_particleCache[i];
-
-            ptc.Velocity = ptc.Velocity + gravity;
-
-            ptc.Position = ptc.Position + (ptc.Velocity * deltaTime);
-
-            ptc.LifeTime -= Time.deltaTime;
-        }
 
         // Prune dead particles
         for (int i = 0; i < m_currentParticleCount; i++)
@@ -97,11 +91,35 @@ public class ParticleSystem2D : MonoBehaviour
             }
         }
 
+        if (CheckAndSpawnNewParticles())
+            indiciesUpdated = true;
 
         //////////////////
         /// APPLY FORCES
         //////////////////
+        for (int i = 0; i < Forces.Count; i++)
+        {
+            for (int k = 0; k < m_currentParticleCount; k++)
+            {
+                if (Forces[i].PointIsInShape(m_particleCache[k].Position))
+                    Forces[i].ApplyForce(m_particleCache[k]);
+            }
+        }
 
+        // Update the particle's position and other things.
+        float deltaTime = Time.deltaTime;
+        Vector2 gravity = Physics2D.gravity * deltaTime;
+
+        for (int i = 0; i < m_currentParticleCount; i++)
+        {
+            Particle2D ptc = m_particleCache[i];
+
+            ptc.Velocity = ptc.Velocity + gravity;
+
+            ptc.Position = ptc.Position + (ptc.Velocity * deltaTime);
+
+            ptc.LifeTime -= Time.deltaTime;
+        }
 
         //////////////////
         /// RESOLVE/CHECK COLLISIONS
@@ -227,5 +245,30 @@ public class ParticleSystem2D : MonoBehaviour
         // Bottom Right
         m_vertices[(particleIndex * 4) + 3].x = prt.Position.x + sizeHalf;
         m_vertices[(particleIndex * 4) + 3].y = prt.Position.y - sizeHalf;
+    }
+
+    public void RemoveForce(BaseParticleForce2D force)
+    {
+        if(!Forces.Contains(force))
+        {
+            Debug.LogWarning(string.Format("Attempted to remove force {0} from system {1} but system does not contain that force!", force.name, gameObject.name));
+            return;
+        }
+
+        Forces.Remove(force);
+
+        force.OnForceRemovedFromSystem(this);
+    }
+
+    public void AddForce(BaseParticleForce2D force)
+    {
+        if (Forces.Contains(force))
+        {
+            Debug.LogWarning(string.Format("Attempted to add force {0} from system {1} but system already contains that force!", force.name, gameObject.name));
+            return;
+        }
+
+        Forces.Add(force);
+        force.OnForceAddedToSystem(this);
     }
 }
